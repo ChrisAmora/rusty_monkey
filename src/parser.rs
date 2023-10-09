@@ -274,4 +274,60 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_as_str() {
+        use crate::lexer;
+
+        let program = r#"
+        foobar;
+        baafoo;
+        lasagna;
+        5;
+        6;
+        !5;
+        -8;
+        potato;
+        5 + 5;
+        3 - 9;
+        3 * 9;
+        foo * bar;
+        88 + 2 * 3;
+        "#;
+
+        let mut lexer = lexer::Lexer::new(program.chars());
+        let peek = lexer.peekable_iter();
+        let mut parser = Parser::new(peek);
+
+        let expected_vec = vec![
+            String::from("foobar"),
+            String::from("baafoo"),
+            String::from("lasagna"),
+            String::from("5"),
+            String::from("6"),
+            String::from("(!5)"),
+            String::from("(-8)"),
+            String::from("potato"),
+            String::from("(5+5)"),
+            String::from("(3-9)"),
+            String::from("(3*9)"),
+            String::from("(foo*bar)"),
+            String::from("(88+(2*3))"),
+        ];
+
+        let mut expected = expected_vec.iter();
+
+        while let Some(statement) = parser.parse_next_statement() {
+            match statement {
+                Statement::Expression(expression) => {
+                    let formatted = format!("{}", expression);
+                    assert_eq!(&formatted, expected.next().unwrap());
+                }
+                _ => {
+                    println!("here");
+                    panic!("here");
+                }
+            }
+        }
+    }
 }
