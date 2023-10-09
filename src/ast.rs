@@ -9,7 +9,7 @@ pub enum Statement {
         identifier: Identifier,
         expression: Expression,
     },
-    Return,
+    Return(Expression),
     Expression(Expression),
 }
 

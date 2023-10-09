@@ -1,4 +1,3 @@
-#![allow(dead_code, unused_variables)]
 #![allow(clippy::unused_unit, clippy::single_match, clippy::needless_return)]
 use crate::ast::{Expression, Infix, Literal, Prefix, PrefixOperation, Statement};
 use crate::token::{Identifier, TokenType};
@@ -7,38 +6,29 @@ use std::vec::IntoIter;
 
 pub struct Parser {
     tokens: Peekable<IntoIter<TokenType>>,
-    current_token: Option<TokenType>,
 }
 
 impl Parser {
     pub fn new(tokens: Peekable<IntoIter<TokenType>>) -> Self {
-        Parser {
-            tokens,
-            current_token: None,
-        }
+        Parser { tokens }
     }
 
     pub fn parse_next_statement(&mut self) -> Option<Statement> {
         if let Some(token) = self.tokens.next() {
-            self.current_token = Some(token.clone());
             return match token {
                 TokenType::Let => {
                     let identifier = self.assert_next_ident();
-                    self.assert_next(TokenType::Assign).unwrap();
-                    let expression = self.parse_expr_statement();
-                    // self.assert_next(TokenType::Semicolon);
-                    Some(Statement::Let {
-                        identifier,
-                        expression,
-                    })
+                    self.assert_next_and_advance(TokenType::Assign).unwrap();
+                    let statement = self.parse_expr_statement();
+                    Some(statement)
                 }
                 TokenType::Return => {
-                    let expression = self.parse_expr_statement();
-                    Some(Statement::Return)
+                    let statement = self.parse_expr_statement();
+                    Some(statement)
                 }
                 token => {
-                    let expression = self.parse_expression(0)?;
-                    self.assert_next(TokenType::Semicolon);
+                    let expression = self.parse_expression(0, token);
+                    self.assert_next_and_advance(TokenType::Semicolon);
                     Some(Statement::Expression(expression))
                 }
             };
@@ -46,52 +36,54 @@ impl Parser {
         None
     }
 
-    pub fn assert_next(&mut self, token: TokenType) -> Option<TokenType> {
+    pub fn assert_next_and_advance(&mut self, token: TokenType) -> Option<TokenType> {
         self.tokens.next_if_eq(&token)
     }
 
     pub fn try_next_token(&mut self) -> TokenType {
-        let token = self.tokens.peek().unwrap().clone();
-        self.current_token = Some(token);
-        let next_token = self.tokens.next();
-        next_token.unwrap()
+        self.tokens.next().unwrap()
     }
 
     pub fn assert_next_ident(&mut self) -> Identifier {
         self.try_next_token().try_into().unwrap()
     }
 
-    pub fn parse_expr_statement(&mut self) -> Expression {
-        while self.try_next_token() != TokenType::Semicolon {
+    pub fn parse_expr_statement(&mut self) -> Statement {
+        let new_token = self.try_next_token();
+        let left = self.parse_expression(0, new_token);
+        while self.assert_next_and_advance(TokenType::Semicolon).is_some() {
             continue;
         }
 
-        Expression::Identifier(Identifier::new("lol".to_string()))
+        Statement::Return(left)
     }
 
-    pub fn parse_expression(&mut self, precedente: usize) -> Option<Expression> {
-        let mut left = self.parse_prefix().unwrap();
-
-        while !self.assert_peek(TokenType::Semicolon) && precedente < self.peek_precedence() {
-            let token = self.peek();
-            match token.operation() {
-                Some(_) => {
-                    self.try_next_token();
-                    left = self.parse_infix_expression(left);
-                }
+    pub fn parse_expression(&mut self, precedente: usize, current_token: TokenType) -> Expression {
+        let mut left = self.parse_prefix(current_token).unwrap();
+        while !self.assert_peek(&TokenType::Semicolon) && precedente < self.peek_precedence() {
+            let next = self.tokens.next_if(|token| token.operation().is_some());
+            match next {
+                Some(next) => left = self.parse_infix_expression(left, next),
                 None => break,
             }
         }
-        Some(left)
+        left
     }
 
-    fn parse_prefix_expression(&mut self, operation: crate::ast::PrefixOperation) -> Expression {
+    fn parse_prefix_expression(&mut self, operation: PrefixOperation) -> Expression {
         let token = self.try_next_token();
-        let expression = self.parse_expression(6).unwrap();
+        let expression = self.parse_expression(6, token);
         Expression::Prefix(Prefix {
             operation,
-            expression: Box::new(expression),
+            expression: expression.boxed(),
         })
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+        let previous_token = self.try_next_token();
+        let expression = self.parse_expression(0, previous_token);
+        self.assert_next_and_advance(TokenType::RParen)?;
+        Some(expression)
     }
 
     fn peek_precedence(&mut self) -> usize {
@@ -99,34 +91,28 @@ impl Parser {
         current_token.precedence()
     }
 
-    fn current_precedence(&mut self) -> usize {
-        let current_token = self.current_token.clone().unwrap();
-        current_token.precedence()
+    fn assert_peek(&mut self, token: &TokenType) -> bool {
+        self.tokens.peek().unwrap() == token
     }
 
-    fn peek(&mut self) -> &TokenType {
-        self.tokens.peek().unwrap()
-    }
-
-    fn assert_peek(&mut self, token: TokenType) -> bool {
-        self.peek().clone() == token
-    }
-
-    fn parse_infix_expression(&mut self, left_expression: Expression) -> Expression {
-        let precedence = self.current_precedence();
-        let token = self.current_token.clone().unwrap();
+    fn parse_infix_expression(
+        &mut self,
+        left_expression: Expression,
+        token: TokenType,
+    ) -> Expression {
+        let precedence = token.precedence();
         let operation = token.operation().unwrap();
-        self.try_next_token();
-        let right_expression = self.parse_expression(precedence).unwrap();
+
+        let token_new = self.try_next_token();
+        let right_expression = self.parse_expression(precedence, token_new);
         Expression::Infix(Infix {
-            right_expression: Box::new(right_expression),
+            right_expression: right_expression.boxed(),
             operation,
-            left_expression: Box::new(left_expression),
+            left_expression: left_expression.boxed(),
         })
     }
 
-    pub fn parse_prefix(&mut self) -> Option<Expression> {
-        let token = self.current_token.clone().unwrap();
+    pub fn parse_prefix(&mut self, token: TokenType) -> Option<Expression> {
         match token {
             TokenType::Identifier(name) => Some(Expression::Identifier(name.to_owned())),
             TokenType::Int(num) => Some(Expression::Literal(Literal::Int(num.to_owned()))),
@@ -135,11 +121,13 @@ impl Parser {
             TokenType::Nil => Some(Expression::Literal(Literal::Nil)),
             TokenType::Bang => Some(self.parse_prefix_expression(PrefixOperation::Bang)),
             TokenType::Minus => Some(self.parse_prefix_expression(PrefixOperation::Minus)),
+            TokenType::LParen => self.parse_grouped_expression(),
             _ => None,
         }
     }
 }
 
+#[cfg(test)]
 mod test {
     use crate::{
         ast::{Expression, Infix, InfixOperation, Literal, Prefix, PrefixOperation, Statement},
@@ -183,9 +171,7 @@ mod test {
     fn return_expression() {
         use crate::lexer;
         let program = r#"
-        return 5;
         return 10;
-        return 993322;
         "#;
 
         let mut lexer = lexer::Lexer::new(program.chars());
@@ -193,7 +179,10 @@ mod test {
         let mut parser = Parser::new(peek);
 
         while let Some(statement) = parser.parse_next_statement() {
-            assert!(matches!(statement, Statement::Return));
+            assert!(matches!(
+                statement,
+                Statement::Return(Expression::Literal(Literal::Int(10)))
+            ));
         }
     }
 
@@ -273,7 +262,6 @@ mod test {
         while let Some(statement) = parser.parse_next_statement() {
             match statement {
                 Statement::Expression(expression) => {
-                    // println!("{}", expression);
                     assert_eq!(&expression, expected.next().unwrap());
                 }
                 _ => {
@@ -305,7 +293,16 @@ mod test {
         1 + 2 + 3;
         false == false;
         false <= true;
+        1 + (2 + 3) + 4;
+        !(true == true);
+        -(5 + 5);
+        2 / (5 + 5);
+        (5 + 5) * 2;
         "#;
+
+        // let program = r#"
+        // !(true);
+        // "#;
 
         let mut lexer = lexer::Lexer::new(program.chars());
         let peek = lexer.peekable_iter();
@@ -328,7 +325,14 @@ mod test {
             String::from("((1+2)+3)"),
             String::from("(false==false)"),
             String::from("(false<=true)"),
+            String::from("((1+(2+3))+4)"),
+            String::from("(!(true==true))"),
+            String::from("(-(5+5))"),
+            String::from("(2/(5+5))"),
+            String::from("((5+5)*2)"),
         ];
+
+        // let expected_vec = vec![String::from("(!true)")];
 
         let mut expected = expected_vec.iter();
 
