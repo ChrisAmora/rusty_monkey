@@ -1,3 +1,5 @@
+use core::fmt;
+
 use anyhow::{anyhow, Result};
 
 use crate::ast::InfixOperation;
@@ -43,10 +45,19 @@ pub enum TokenType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier(pub String);
 
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
 impl Identifier {
-    #[inline]
     pub fn new(name: String) -> Self {
         Self(name)
+    }
+
+    pub fn new_str(name: &str) -> Self {
+        Self(name.to_string())
     }
 }
 
@@ -81,6 +92,14 @@ impl TokenType {
         match self {
             TokenType::Plus => Some(InfixOperation::Add),
             TokenType::Minus => Some(InfixOperation::Sub),
+            TokenType::Asterisk => Some(InfixOperation::Mul),
+            TokenType::Slash => Some(InfixOperation::Div),
+            TokenType::Eq => Some(InfixOperation::Eq),
+            TokenType::NotEq => Some(InfixOperation::NotEq),
+            TokenType::Lt => Some(InfixOperation::Lt),
+            TokenType::Lte => Some(InfixOperation::Lte),
+            TokenType::Gt => Some(InfixOperation::Gt),
+            TokenType::Gte => Some(InfixOperation::Gte),
             _ => None,
         }
     }

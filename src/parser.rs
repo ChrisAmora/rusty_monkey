@@ -203,6 +203,9 @@ mod test {
         potato;
         5 + 5;
         3 - 9;
+        3 * 9;
+        foo * bar;
+        88 + 2 * 3;
         "#;
 
         let mut lexer = lexer::Lexer::new(program.chars());
@@ -234,6 +237,26 @@ mod test {
                 right_expression: Box::new(Expression::Literal(Literal::Int(9))),
                 operation: InfixOperation::Sub,
             }),
+            Expression::Infix(Infix {
+                left_expression: Box::new(Expression::Literal(Literal::Int(3))),
+                right_expression: Box::new(Expression::Literal(Literal::Int(9))),
+                operation: InfixOperation::Mul,
+            }),
+            Expression::Infix(Infix {
+                left_expression: Expression::Identifier(Identifier::new_str("foo")).boxed(),
+                right_expression: Expression::Identifier(Identifier::new_str("bar")).boxed(),
+                operation: InfixOperation::Mul,
+            }),
+            Expression::Infix(Infix {
+                left_expression: Expression::Literal(Literal::Int(88)).boxed(),
+                right_expression: Expression::Infix(Infix {
+                    left_expression: Expression::Literal(Literal::Int(2)).boxed(),
+                    right_expression: Expression::Literal(Literal::Int(3)).boxed(),
+                    operation: InfixOperation::Mul,
+                })
+                .boxed(),
+                operation: InfixOperation::Add,
+            }),
         ];
 
         let mut expected = expected_vec.iter();
@@ -241,9 +264,13 @@ mod test {
         while let Some(statement) = parser.parse_next_statement() {
             match statement {
                 Statement::Expression(expression) => {
+                    println!("{}", expression);
                     assert_eq!(&expression, expected.next().unwrap());
                 }
-                _ => {}
+                _ => {
+                    println!("here");
+                    panic!("here");
+                }
             }
         }
     }
