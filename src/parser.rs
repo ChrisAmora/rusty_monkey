@@ -51,8 +51,9 @@ impl Parser {
     }
 
     pub fn try_next_token(&mut self) -> TokenType {
+        let token = self.tokens.peek().unwrap().clone();
+        self.current_token = Some(token);
         let next_token = self.tokens.next();
-        self.current_token = next_token.clone();
         next_token.unwrap()
     }
 
@@ -94,7 +95,12 @@ impl Parser {
     }
 
     fn peek_precedence(&mut self) -> usize {
-        let current_token = self.tokens.peek().unwrap();
+        let current_token = self.tokens.peek().unwrap().to_owned();
+        current_token.precedence()
+    }
+
+    fn current_precedence(&mut self) -> usize {
+        let current_token = self.current_token.clone().unwrap();
         current_token.precedence()
     }
 
@@ -107,7 +113,7 @@ impl Parser {
     }
 
     fn parse_infix_expression(&mut self, left_expression: Expression) -> Expression {
-        let precedence = self.peek_precedence();
+        let precedence = self.current_precedence();
         let token = self.current_token.clone().unwrap();
         let operation = token.operation().unwrap();
         self.try_next_token();
@@ -124,6 +130,9 @@ impl Parser {
         match token {
             TokenType::Identifier(name) => Some(Expression::Identifier(name.to_owned())),
             TokenType::Int(num) => Some(Expression::Literal(Literal::Int(num.to_owned()))),
+            TokenType::True => Some(Expression::Literal(Literal::True)),
+            TokenType::False => Some(Expression::Literal(Literal::False)),
+            TokenType::Nil => Some(Expression::Literal(Literal::Nil)),
             TokenType::Bang => Some(self.parse_prefix_expression(PrefixOperation::Bang)),
             TokenType::Minus => Some(self.parse_prefix_expression(PrefixOperation::Minus)),
             _ => None,
@@ -264,7 +273,7 @@ mod test {
         while let Some(statement) = parser.parse_next_statement() {
             match statement {
                 Statement::Expression(expression) => {
-                    println!("{}", expression);
+                    // println!("{}", expression);
                     assert_eq!(&expression, expected.next().unwrap());
                 }
                 _ => {
@@ -293,6 +302,9 @@ mod test {
         3 * 9;
         foo * bar;
         88 + 2 * 3;
+        1 + 2 + 3;
+        false == false;
+        false <= true;
         "#;
 
         let mut lexer = lexer::Lexer::new(program.chars());
@@ -313,6 +325,9 @@ mod test {
             String::from("(3*9)"),
             String::from("(foo*bar)"),
             String::from("(88+(2*3))"),
+            String::from("((1+2)+3)"),
+            String::from("(false==false)"),
+            String::from("(false<=true)"),
         ];
 
         let mut expected = expected_vec.iter();
@@ -321,6 +336,7 @@ mod test {
             match statement {
                 Statement::Expression(expression) => {
                     let formatted = format!("{}", expression);
+                    println!("{}", expression);
                     assert_eq!(&formatted, expected.next().unwrap());
                 }
                 _ => {

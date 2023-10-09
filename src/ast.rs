@@ -96,7 +96,7 @@ impl fmt::Display for PrefixOperation {
 impl fmt::Display for InfixOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            InfixOperation::Eq => f.write_str("="),
+            InfixOperation::Eq => f.write_str("=="),
             InfixOperation::Lt => f.write_str("<"),
             InfixOperation::Gt => f.write_str(">"),
             InfixOperation::Gte => f.write_str(">="),
