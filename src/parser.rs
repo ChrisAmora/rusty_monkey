@@ -87,8 +87,7 @@ impl Parser {
     }
 
     fn peek_precedence(&mut self) -> usize {
-        let current_token = self.tokens.peek().unwrap().to_owned();
-        current_token.precedence()
+        self.tokens.peek().unwrap().precedence()
     }
 
     fn assert_peek(&mut self, token: &TokenType) -> bool {
@@ -143,7 +142,7 @@ mod test {
         let ten = 10 + 2;
         "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars());
+        let mut lexer = lexer::Lexer::new(program.chars().peekable());
         let peek = lexer.peekable_iter();
         let mut parser = Parser::new(peek);
 
@@ -174,7 +173,7 @@ mod test {
         return 10;
         "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars());
+        let mut lexer = lexer::Lexer::new(program.chars().peekable());
         let peek = lexer.peekable_iter();
         let mut parser = Parser::new(peek);
 
@@ -206,7 +205,7 @@ mod test {
         88 + 2 * 3;
         "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars());
+        let mut lexer = lexer::Lexer::new(program.chars().peekable());
         let peek = lexer.peekable_iter();
         let mut parser = Parser::new(peek);
 
@@ -304,7 +303,7 @@ mod test {
         // !(true);
         // "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars());
+        let mut lexer = lexer::Lexer::new(program.chars().peekable());
         let peek = lexer.peekable_iter();
         let mut parser = Parser::new(peek);
 

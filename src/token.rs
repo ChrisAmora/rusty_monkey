@@ -61,13 +61,9 @@ impl Identifier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct MyError;
-
 impl TryFrom<TokenType> for Identifier {
     type Error = anyhow::Error;
 
-    #[inline]
     fn try_from(token: TokenType) -> Result<Self, Self::Error> {
         match token {
             TokenType::Identifier(name) => Ok(name),

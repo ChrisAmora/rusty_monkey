@@ -1,23 +1,16 @@
 #![allow(dead_code)]
 use crate::token::{Identifier, TokenType};
 use std::iter::{self, Peekable};
+use std::str::Chars;
 use std::vec::IntoIter;
 
-pub struct Lexer<I>
-where
-    I: Iterator<Item = char>,
-{
-    chars_iter: Peekable<I>,
+pub struct Lexer {
+    chars_iter: Peekable<Chars<'static>>,
 }
 
-impl<I> Lexer<I>
-where
-    I: Iterator<Item = char>,
-{
-    pub fn new(chars_iter: I) -> Self {
-        Lexer {
-            chars_iter: chars_iter.peekable(),
-        }
+impl Lexer {
+    pub fn new(chars_iter: Peekable<Chars<'static>>) -> Self {
+        Lexer { chars_iter }
     }
 
     pub fn peekable_iter(&mut self) -> Peekable<IntoIter<TokenType>> {
@@ -120,6 +113,6 @@ return false;
 10 != 9;
 "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars());
+        let mut lexer = lexer::Lexer::new(program.chars().peekable());
     }
 }

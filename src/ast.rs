@@ -1,5 +1,4 @@
 use core::fmt;
-use std::mem::uninitialized;
 
 use crate::token::Identifier;
 
