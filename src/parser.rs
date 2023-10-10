@@ -1,6 +1,6 @@
 #![allow(clippy::unused_unit, clippy::single_match, clippy::needless_return)]
 use crate::ast::{
-    Block, Expression, Function, If, Infix, Literal, Prefix, PrefixOperation, Statement,
+    Block, Call, Expression, Function, If, Infix, Literal, Prefix, PrefixOperation, Statement,
 };
 use crate::token::{Identifier, TokenType};
 use std::iter::Peekable;
@@ -70,7 +70,10 @@ impl Parser {
         while !self.assert_peek(&TokenType::Semicolon) && precedente < self.peek_precedence() {
             let next = self.tokens.next_if(|token| token.operation().is_some());
             match next {
-                Some(next) => left = self.parse_infix_expression(left, next),
+                Some(next) => match next {
+                    TokenType::LParen => left = self.parse_call_expression(left),
+                    _ => left = self.parse_infix_expression(left, next),
+                },
                 None => break,
             }
         }
@@ -150,9 +153,33 @@ impl Parser {
             let current_token = self.try_next_token();
             identifiers.push(Identifier::new(current_token.to_string()));
         }
-        self.try_next_token();
-
+        self.assert_next_and_advance(TokenType::RParen);
         identifiers
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Expression> {
+        let mut args = vec![];
+        if self.tokens.peek().unwrap() == &TokenType::RParen {
+            self.try_next_token();
+            return args;
+        }
+        let current_token = self.try_next_token();
+        args.push(self.parse_expression(0, current_token));
+        while self.tokens.peek().unwrap() == &TokenType::Comma {
+            self.try_next_token();
+            let current_token = self.try_next_token();
+            args.push(self.parse_expression(0, current_token));
+        }
+        self.assert_next_and_advance(TokenType::RParen);
+        args
+    }
+
+    fn parse_call_expression(&mut self, function: Expression) -> Expression {
+        let arguments = self.parse_call_arguments();
+        Expression::Call(Call {
+            function: function.boxed(),
+            arguments,
+        })
     }
 
     fn peek_precedence(&mut self) -> usize {
@@ -374,10 +401,11 @@ mod test {
         fn() {};
         fn(x) {};
         fn(x, y, z) {};
+        a + add(b * c) + d;
         "#;
 
         // let program = r#"
-        // fn(x, y) { x + y; };
+        // add(b) + 3;
         // "#;
 
         let mut lexer = lexer::Lexer::new(program.chars().peekable());
@@ -412,9 +440,10 @@ mod test {
             String::from("fn ()"),
             String::from("fn (x)"),
             String::from("fn (x, y, z)"),
+            String::from("((a+add ((b*c)))+d)"),
         ];
 
-        // let expected_vec = vec![String::from("(!true)")];
+        // let expected_vec = vec![String::from("(mock!)")];
 
         let mut expected = expected_vec.iter();
         while let Some(statement) = parser.parse_next_statement() {

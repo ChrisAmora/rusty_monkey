@@ -108,6 +108,8 @@ impl TokenType {
             TokenType::Lte => Some(InfixOperation::Lte),
             TokenType::Gt => Some(InfixOperation::Gt),
             TokenType::Gte => Some(InfixOperation::Gte),
+            TokenType::LParen => Some(InfixOperation::LParen),
+
             _ => None,
         }
     }

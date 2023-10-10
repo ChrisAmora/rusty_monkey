@@ -1,7 +1,7 @@
 use core::fmt;
 use std::fmt::Display;
 
-use crate::token::Identifier;
+use crate::token::{Identifier, TokenType};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Statement {
@@ -22,6 +22,7 @@ pub enum Expression {
     Infix(Infix),
     If(If),
     Function(Function),
+    Call(Call),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -51,6 +52,7 @@ pub enum InfixOperation {
     Gte,
     Mul,
     Div,
+    LParen,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -63,6 +65,12 @@ pub struct Prefix {
 pub struct Function {
     pub params: Vec<Identifier>,
     pub body: Block,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Call {
+    pub arguments: Vec<Expression>,
+    pub function: Box<Expression>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -111,8 +119,7 @@ impl Display for Literal {
 
 impl Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // write!(f, "{}", TokenType::Function);
-        write!(f, "fn (")?;
+        write!(f, "{} (", TokenType::Function)?;
 
         for (index, param) in self.params.iter().enumerate() {
             write!(f, "{}", param)?;
@@ -188,6 +195,7 @@ impl Display for InfixOperation {
             InfixOperation::NotEq => f.write_str("!="),
             InfixOperation::Mul => f.write_str("*"),
             InfixOperation::Div => f.write_str("/"),
+            InfixOperation::LParen => f.write_str("("),
         }
     }
 }
@@ -201,6 +209,7 @@ impl Display for Expression {
             Expression::If(if_expression) => write!(f, "{if_expression}"),
             Expression::Identifier(identifier) => write!(f, "{identifier}"),
             Expression::Function(function) => write!(f, "{function}"),
+            Expression::Call(call) => write!(f, "{call}"),
         }
     }
 }
@@ -234,5 +243,19 @@ impl Display for If {
             None => {}
         }
         write!(f, "")
+    }
+}
+
+impl Display for Call {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let function = &self.function;
+        write!(f, "{} (", function)?;
+        for (index, expression) in self.arguments.iter().enumerate() {
+            write!(f, "{expression}")?;
+            if index != self.arguments.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")")
     }
 }
