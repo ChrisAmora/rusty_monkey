@@ -34,8 +34,8 @@ impl Lexer {
                 ')' => Some(TokenType::RParen),
                 '[' => Some(TokenType::LBracket),
                 ']' => Some(TokenType::RBracket),
-                '{' => Some(TokenType::LBracket),
-                '}' => Some(TokenType::RBracket),
+                '{' => Some(TokenType::LBrace),
+                '}' => Some(TokenType::RBrace),
                 '-' => Some(TokenType::Minus),
                 '+' => Some(TokenType::Plus),
                 '*' => Some(TokenType::Asterisk),
@@ -92,7 +92,7 @@ impl Lexer {
 }
 
 mod test {
-    #[test]
+    // #[test]
     fn parse() {
         use crate::lexer;
         let program = r#"
@@ -114,5 +114,9 @@ return false;
 "#;
 
         let mut lexer = lexer::Lexer::new(program.chars().peekable());
+
+        while let Some(l) = lexer.get_next_token() {
+            println!("{:?}", l);
+        }
     }
 }

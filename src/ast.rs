@@ -1,4 +1,5 @@
 use core::fmt;
+use std::fmt::Display;
 
 use crate::token::Identifier;
 
@@ -10,6 +11,7 @@ pub enum Statement {
     },
     Return(Expression),
     Expression(Expression),
+    Block(Block),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -18,6 +20,7 @@ pub enum Expression {
     Literal(Literal),
     Prefix(Prefix),
     Infix(Infix),
+    If(If),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -56,10 +59,26 @@ pub struct Prefix {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Block(pub Vec<Statement>);
+
+impl Block {
+    pub fn new(value: Vec<Statement>) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Infix {
     pub left_expression: Box<Expression>,
     pub right_expression: Box<Expression>,
     pub operation: InfixOperation,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct If {
+    pub condition: Box<Expression>,
+    pub alternative: Option<Block>,
+    pub consequence: Block,
 }
 
 impl Expression {
@@ -83,12 +102,42 @@ impl fmt::Display for Literal {
     }
 }
 
+impl Display for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Statement::Let {
+                identifier,
+                expression,
+            } => {
+                write!(
+                    f,
+                    "let {} = {}",
+                    identifier.to_string().as_str(),
+                    expression.to_string().as_str()
+                )
+            }
+            Statement::Return(expression) => write!(f, "return {expression}"),
+            Statement::Expression(expression) => write!(f, "return {expression}"),
+            Statement::Block(block) => write!(f, "{block}"),
+        }
+    }
+}
+
 impl fmt::Display for PrefixOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PrefixOperation::Bang => f.write_str("!"),
             PrefixOperation::Minus => f.write_str("-"),
         }
+    }
+}
+
+impl Display for Block {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for statement in &self.0 {
+            write!(f, "{statement}")?
+        }
+        write!(f, "")
     }
 }
 
@@ -112,14 +161,11 @@ impl fmt::Display for InfixOperation {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::Literal(literal) => f.write_str(literal.to_string().as_str()),
-            Expression::Prefix(prefix) => f.write_str(prefix.to_string().as_str()),
-            Expression::Infix(infix) => f.write_str(infix.to_string().as_str()),
-
-            Expression::Identifier(identifier) => {
-                let formatted = identifier.to_string();
-                f.write_str(formatted.as_str())
-            }
+            Expression::Literal(literal) => write!(f, "{literal}"),
+            Expression::Prefix(prefix) => write!(f, "{prefix}"),
+            Expression::Infix(infix) => write!(f, "{infix}"),
+            Expression::If(if_expression) => write!(f, "{if_expression}"),
+            Expression::Identifier(identifier) => write!(f, "{identifier}"),
         }
     }
 }
@@ -138,5 +184,20 @@ impl fmt::Display for Infix {
         let right = self.right_expression.to_string();
         let operator = self.operation.to_string();
         write!(f, "({}{}{})", left, operator, right)
+    }
+}
+
+impl fmt::Display for If {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let condition = self.condition.to_string();
+        let consequence = self.consequence.to_string();
+        write!(f, "if {} {}", condition, consequence)?;
+        match &self.alternative {
+            Some(alt) => {
+                write!(f, " else {}", alt)?;
+            }
+            None => {}
+        }
+        write!(f, "")
     }
 }
