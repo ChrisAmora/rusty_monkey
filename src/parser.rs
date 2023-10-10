@@ -1,4 +1,3 @@
-#![allow(clippy::unused_unit, clippy::single_match, clippy::needless_return)]
 use crate::ast::{
     Block, Call, Expression, Function, If, Infix, Literal, Prefix, PrefixOperation, Statement,
 };
@@ -16,31 +15,27 @@ impl Parser {
     }
 
     pub fn parse_next_statement(&mut self) -> Option<Statement> {
-        match self.tokens.next() {
-            Some(token) => self.parse_statement(token),
-            None => None,
-        }
+        self.tokens
+            .next()
+            .and_then(|token| self.parse_statement(token))
     }
 
     fn parse_statement(&mut self, token: TokenType) -> Option<Statement> {
-        return match token {
+        match token {
             TokenType::Let => {
-                let identifier = self.assert_next_ident();
-                self.assert_next_and_advance(TokenType::Assign).unwrap();
-                let statement = self.parse_expr_statement();
+                let statement = self.parse_let();
                 Some(statement)
             }
             TokenType::Return => {
                 let statement = self.parse_expr_statement();
                 Some(statement)
             }
-            TokenType::Eof => None,
             token => {
                 let expression = self.parse_expression(0, token);
                 self.assert_next_and_advance(TokenType::Semicolon);
                 Some(Statement::Expression(expression))
             }
-        };
+        }
     }
 
     pub fn assert_next_and_advance(&mut self, token: TokenType) -> Option<TokenType> {
@@ -58,11 +53,21 @@ impl Parser {
     pub fn parse_expr_statement(&mut self) -> Statement {
         let new_token = self.try_next_token();
         let left = self.parse_expression(0, new_token);
-        while self.assert_next_and_advance(TokenType::Semicolon).is_some() {
-            continue;
-        }
-
+        self.tokens.next_if_eq(&TokenType::Semicolon);
         Statement::Return(left)
+    }
+
+    pub fn parse_let(&mut self) -> Statement {
+        let token = self.try_next_token();
+        let identifier = Identifier(token.to_string());
+        self.assert_next_and_advance(TokenType::Assign);
+        let current_token = self.try_next_token();
+        let expression = self.parse_expression(0, current_token);
+        self.tokens.next_if_eq(&TokenType::Semicolon);
+        Statement::Let {
+            identifier,
+            expression,
+        }
     }
 
     pub fn parse_expression(&mut self, precedente: usize, current_token: TokenType) -> Expression {
@@ -129,25 +134,19 @@ impl Parser {
 
     fn parse_function(&mut self) -> Expression {
         self.assert_next_and_advance(TokenType::LParen);
-
         let params = self.parse_function_params();
         self.assert_next_and_advance(TokenType::LBrace);
-
         let body = self.parse_block();
-
         Expression::Function(Function { body, params })
     }
 
     fn parse_function_params(&mut self) -> Vec<Identifier> {
         let mut identifiers = vec![];
-
-        if self.tokens.peek().unwrap() == &TokenType::RParen {
-            self.try_next_token();
+        if self.tokens.next_if_eq(&TokenType::RParen).is_some() {
             return identifiers;
-        }
+        };
         let token = self.try_next_token();
         identifiers.push(Identifier::new(token.to_string()));
-
         while self.tokens.peek().unwrap() == &TokenType::Comma {
             self.try_next_token();
             let current_token = self.try_next_token();
@@ -159,10 +158,9 @@ impl Parser {
 
     fn parse_call_arguments(&mut self) -> Vec<Expression> {
         let mut args = vec![];
-        if self.tokens.peek().unwrap() == &TokenType::RParen {
-            self.try_next_token();
+        if self.tokens.next_if_eq(&TokenType::RParen).is_some() {
             return args;
-        }
+        };
         let current_token = self.try_next_token();
         args.push(self.parse_expression(0, current_token));
         while self.tokens.peek().unwrap() == &TokenType::Comma {
@@ -402,10 +400,12 @@ mod test {
         fn(x) {};
         fn(x, y, z) {};
         a + add(b * c) + d;
+        let x = fn(x) {5 + 3};
+        return x(5+3);
         "#;
 
         // let program = r#"
-        // add(b) + 3;
+        // let foobar = y;
         // "#;
 
         let mut lexer = lexer::Lexer::new(program.chars().peekable());
@@ -434,31 +434,24 @@ mod test {
             String::from("(-(5+5))"),
             String::from("(2/(5+5))"),
             String::from("((5+5)*2)"),
-            String::from("if (5+10) return (10+3)"),
-            String::from("if (!true) return (!5) else return (99+2)"),
-            String::from("fn (x, y) return (x+y)"),
+            String::from("if (5+10) (10+3)"),
+            String::from("if (!true) (!5) else (99+2)"),
+            String::from("fn (x, y) (x+y)"),
             String::from("fn ()"),
             String::from("fn (x)"),
             String::from("fn (x, y, z)"),
             String::from("((a+add ((b*c)))+d)"),
+            String::from("let x = fn (x) (5+3)"),
+            String::from("return x ((5+3))"),
         ];
 
         // let expected_vec = vec![String::from("(mock!)")];
 
         let mut expected = expected_vec.iter();
         while let Some(statement) = parser.parse_next_statement() {
-            match statement {
-                Statement::Expression(expression) => {
-                    let formatted = format!("{}", expression);
-                    println!("{}", expression);
-                    // println!("{:?}", expression);
-                    assert_eq!(&formatted, expected.next().unwrap());
-                }
-                _ => {
-                    println!("here");
-                    panic!("here");
-                }
-            }
+            let formatted = format!("{statement}");
+            println!("{formatted}");
+            assert_eq!(&formatted, expected.next().unwrap());
         }
     }
 }

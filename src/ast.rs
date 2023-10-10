@@ -117,6 +117,20 @@ impl Display for Literal {
     }
 }
 
+impl Display for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Statement::Let {
+                identifier,
+                expression,
+            } => write!(f, "let {identifier} = {expression}"),
+            Statement::Block(block) => write!(f, "{block}"),
+            Statement::Return(ret) => write!(f, "return {ret}"),
+            Statement::Expression(expression) => write!(f, "{expression}"),
+        }
+    }
+}
+
 impl Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} (", TokenType::Function)?;
@@ -134,27 +148,6 @@ impl Display for Function {
         }
 
         write!(f, "{}", self.body)
-    }
-}
-
-impl Display for Statement {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Statement::Let {
-                identifier,
-                expression,
-            } => {
-                write!(
-                    f,
-                    "let {} = {}",
-                    identifier.to_string().as_str(),
-                    expression.to_string().as_str()
-                )
-            }
-            Statement::Return(expression) => write!(f, "return {expression}"),
-            Statement::Expression(expression) => write!(f, "return {expression}"),
-            Statement::Block(block) => write!(f, "{block}"),
-        }
     }
 }
 
