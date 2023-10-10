@@ -1,4 +1,5 @@
 use core::fmt;
+use std::fmt::Display;
 
 use anyhow::{anyhow, Result};
 
@@ -45,9 +46,20 @@ pub enum TokenType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier(pub String);
 
-impl fmt::Display for Identifier {
+impl Display for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.0.as_str())
+    }
+}
+
+impl Display for TokenType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenType::Function => write!(f, "fn"),
+            TokenType::Identifier(identifier) => write!(f, "{identifier}"),
+            TokenType::Eq => write!(f, ""),
+            _ => write!(f, ""),
+        }
     }
 }
 

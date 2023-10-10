@@ -1,5 +1,7 @@
 #![allow(clippy::unused_unit, clippy::single_match, clippy::needless_return)]
-use crate::ast::{Block, Expression, If, Infix, Literal, Prefix, PrefixOperation, Statement};
+use crate::ast::{
+    Block, Expression, Function, If, Infix, Literal, Prefix, PrefixOperation, Statement,
+};
 use crate::token::{Identifier, TokenType};
 use std::iter::Peekable;
 use std::vec::IntoIter;
@@ -122,6 +124,37 @@ impl Parser {
         Block(statements.into_iter().flatten().collect())
     }
 
+    fn parse_function(&mut self) -> Expression {
+        self.assert_next_and_advance(TokenType::LParen);
+
+        let params = self.parse_function_params();
+        self.assert_next_and_advance(TokenType::LBrace);
+
+        let body = self.parse_block();
+
+        Expression::Function(Function { body, params })
+    }
+
+    fn parse_function_params(&mut self) -> Vec<Identifier> {
+        let mut identifiers = vec![];
+
+        if self.tokens.peek().unwrap() == &TokenType::RParen {
+            self.try_next_token();
+            return identifiers;
+        }
+        let token = self.try_next_token();
+        identifiers.push(Identifier::new(token.to_string()));
+
+        while self.tokens.peek().unwrap() == &TokenType::Comma {
+            self.try_next_token();
+            let current_token = self.try_next_token();
+            identifiers.push(Identifier::new(current_token.to_string()));
+        }
+        self.try_next_token();
+
+        identifiers
+    }
+
     fn peek_precedence(&mut self) -> usize {
         self.tokens.peek().unwrap().precedence()
     }
@@ -158,6 +191,7 @@ impl Parser {
             TokenType::Minus => Some(self.parse_prefix_expression(PrefixOperation::Minus)),
             TokenType::LParen => self.parse_grouped_expression(),
             TokenType::If => self.parse_if_expression(),
+            TokenType::Function => Some(self.parse_function()),
             _ => None,
         }
     }
@@ -336,10 +370,14 @@ mod test {
         (5 + 5) * 2;
         if (5 + 10) {10 + 3};
         if (!true) {!5} else {99 + 2};
+        fn(x, y) { x + y; };
+        fn() {};
+        fn(x) {};
+        fn(x, y, z) {};
         "#;
 
         // let program = r#"
-        // if (5) { x };
+        // fn(x, y) { x + y; };
         // "#;
 
         let mut lexer = lexer::Lexer::new(program.chars().peekable());
@@ -370,6 +408,10 @@ mod test {
             String::from("((5+5)*2)"),
             String::from("if (5+10) return (10+3)"),
             String::from("if (!true) return (!5) else return (99+2)"),
+            String::from("fn (x, y) return (x+y)"),
+            String::from("fn ()"),
+            String::from("fn (x)"),
+            String::from("fn (x, y, z)"),
         ];
 
         // let expected_vec = vec![String::from("(!true)")];

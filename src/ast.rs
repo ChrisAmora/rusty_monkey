@@ -21,6 +21,7 @@ pub enum Expression {
     Prefix(Prefix),
     Infix(Infix),
     If(If),
+    Function(Function),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -59,6 +60,12 @@ pub struct Prefix {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Function {
+    pub params: Vec<Identifier>,
+    pub body: Block,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Block(pub Vec<Statement>);
 
 impl Block {
@@ -87,7 +94,7 @@ impl Expression {
     }
 }
 
-impl fmt::Display for Literal {
+impl Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Literal::Nil => f.write_str("nil"),
@@ -99,6 +106,27 @@ impl fmt::Display for Literal {
                 f.write_str(fmt_str.as_str())
             }
         }
+    }
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // write!(f, "{}", TokenType::Function);
+        write!(f, "fn (")?;
+
+        for (index, param) in self.params.iter().enumerate() {
+            write!(f, "{}", param)?;
+            if index != self.params.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")")?;
+
+        if self.body.len() > 0 {
+            write!(f, " ")?;
+        }
+
+        write!(f, "{}", self.body)
     }
 }
 
@@ -123,7 +151,7 @@ impl Display for Statement {
     }
 }
 
-impl fmt::Display for PrefixOperation {
+impl Display for PrefixOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PrefixOperation::Bang => f.write_str("!"),
@@ -141,7 +169,13 @@ impl Display for Block {
     }
 }
 
-impl fmt::Display for InfixOperation {
+impl Block {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl Display for InfixOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             InfixOperation::Eq => f.write_str("=="),
@@ -158,7 +192,7 @@ impl fmt::Display for InfixOperation {
     }
 }
 
-impl fmt::Display for Expression {
+impl Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expression::Literal(literal) => write!(f, "{literal}"),
@@ -166,11 +200,12 @@ impl fmt::Display for Expression {
             Expression::Infix(infix) => write!(f, "{infix}"),
             Expression::If(if_expression) => write!(f, "{if_expression}"),
             Expression::Identifier(identifier) => write!(f, "{identifier}"),
+            Expression::Function(function) => write!(f, "{function}"),
         }
     }
 }
 
-impl fmt::Display for Prefix {
+impl Display for Prefix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let str_expression = self.expression.to_string();
         let str_operator = self.operation.to_string();
@@ -178,7 +213,7 @@ impl fmt::Display for Prefix {
     }
 }
 
-impl fmt::Display for Infix {
+impl Display for Infix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let left = self.left_expression.to_string();
         let right = self.right_expression.to_string();
@@ -187,7 +222,7 @@ impl fmt::Display for Infix {
     }
 }
 
-impl fmt::Display for If {
+impl Display for If {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let condition = self.condition.to_string();
         let consequence = self.consequence.to_string();
