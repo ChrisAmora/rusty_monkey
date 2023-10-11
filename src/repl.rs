@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{lexer::Lexer, parser::Parser};
+use crate::{eval::Program, lexer::Lexer, parser::Parser};
 pub struct Repl {}
 
 impl Repl {
@@ -23,14 +23,12 @@ impl Repl {
             if input.is_empty() {
                 continue;
             }
-            let mut lexer = Lexer::new(input.chars().peekable());
-            let peek = lexer.peekable_iter();
-            let mut parser = Parser::new(peek);
 
-            while let Some(statement) = parser.parse_next_statement() {
-                let formatted = format!("{statement}");
-                println!("{formatted}");
-            }
+            let mut lexer = Lexer::new_from_str(input.as_str());
+            let mut parser = Parser::new(lexer.peekable_iter());
+            let mut program = Program::new();
+            let eval = program.eval(&mut parser);
+            println!("{eval}");
         }
     }
 }

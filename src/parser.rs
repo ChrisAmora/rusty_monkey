@@ -2,7 +2,7 @@ use crate::ast::{
     Block, Call, Expression, Function, If, Infix, Literal, Prefix, PrefixOperation, Statement,
 };
 use crate::token::{Identifier, TokenType};
-use std::iter::Peekable;
+use std::iter::{self, Peekable};
 use std::vec::IntoIter;
 
 pub struct Parser {
@@ -18,6 +18,10 @@ impl Parser {
         self.tokens
             .next()
             .and_then(|token| self.parse_statement(token))
+    }
+
+    pub fn collect_statements(&mut self) -> Vec<Statement> {
+        iter::from_fn(|| self.parse_next_statement()).collect()
     }
 
     fn parse_statement(&mut self, token: TokenType) -> Option<Statement> {
@@ -445,7 +449,8 @@ mod test {
         // let expected_vec = vec![String::from("(mock!)")];
 
         let mut expected = expected_vec.iter();
-        while let Some(statement) = parser.parse_next_statement() {
+        let statements = parser.collect_statements();
+        for statement in statements {
             let formatted = format!("{statement}");
             println!("{formatted}");
             assert_eq!(&formatted, expected.next().unwrap());

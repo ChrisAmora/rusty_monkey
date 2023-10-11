@@ -13,6 +13,12 @@ impl<'a> Lexer<'a> {
         Lexer { chars_iter }
     }
 
+    pub fn new_from_str(text: &'a str) -> Self {
+        Lexer {
+            chars_iter: text.chars().peekable(),
+        }
+    }
+
     pub fn peekable_iter(&mut self) -> Peekable<IntoIter<TokenType>> {
         let mut all_collected = vec![];
         while let Some(token) = self.get_next_token() {
