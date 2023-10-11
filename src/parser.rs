@@ -72,14 +72,15 @@ impl Parser {
 
     pub fn parse_expression(&mut self, precedente: usize, current_token: TokenType) -> Expression {
         let mut left = self.parse_prefix(current_token).unwrap();
-        while !self.assert_peek(&TokenType::Semicolon) && precedente < self.peek_precedence() {
-            let next = self.tokens.next_if(|token| token.operation().is_some());
+
+        while let Some(next) = self.tokens.next_if(|peek| {
+            peek != &TokenType::Semicolon
+                && precedente < peek.precedence()
+                && peek.operation().is_some()
+        }) {
             match next {
-                Some(next) => match next {
-                    TokenType::LParen => left = self.parse_call_expression(left),
-                    _ => left = self.parse_infix_expression(left, next),
-                },
-                None => break,
+                TokenType::LParen => left = self.parse_call_expression(left),
+                _ => left = self.parse_infix_expression(left, next),
             }
         }
         left

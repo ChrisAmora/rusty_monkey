@@ -4,12 +4,12 @@ use std::iter::{self, Peekable};
 use std::str::Chars;
 use std::vec::IntoIter;
 
-pub struct Lexer {
-    chars_iter: Peekable<Chars<'static>>,
+pub struct Lexer<'a> {
+    chars_iter: Peekable<Chars<'a>>,
 }
 
-impl Lexer {
-    pub fn new(chars_iter: Peekable<Chars<'static>>) -> Self {
+impl<'a> Lexer<'a> {
+    pub fn new(chars_iter: Peekable<Chars<'a>>) -> Self {
         Lexer { chars_iter }
     }
 
