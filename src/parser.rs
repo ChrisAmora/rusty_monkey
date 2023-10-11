@@ -181,10 +181,6 @@ impl Parser {
         })
     }
 
-    fn peek_precedence(&mut self) -> usize {
-        self.tokens.peek().unwrap().precedence()
-    }
-
     fn assert_peek(&mut self, token: &TokenType) -> bool {
         self.tokens.peek().unwrap() == token
     }
