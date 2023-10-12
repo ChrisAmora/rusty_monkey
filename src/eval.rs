@@ -8,10 +8,14 @@ pub struct Program {}
 
 impl Program {
     pub fn eval(&mut self, parser: &mut Parser) -> Object {
-        parser
-            .collect_statements()
-            .iter()
-            .fold(Object::Nil, |_, item| item.eval())
+        let mut result = Object::Nil;
+        for statement in parser.collect_statements() {
+            result = statement.eval();
+            if let Object::Return(expression) = result {
+                return *expression;
+            }
+        }
+        result
     }
 
     pub fn new() -> Self {
@@ -22,17 +26,27 @@ impl Program {
 impl Statement {
     pub fn eval(&self) -> Object {
         match self {
-            Statement::Return(_) => todo!(),
+            Statement::Return(expression) => Object::Return(Box::new(expression.eval())),
             Statement::Expression(expression) => expression.eval(),
             Statement::Block(block) => block.eval(),
-            _ => todo!(),
+            Statement::Let {
+                identifier,
+                expression,
+            } => todo!(),
         }
     }
 }
 
 impl Block {
     pub fn eval(&self) -> Object {
-        self.0.iter().fold(Object::Nil, |_, item| item.eval())
+        let mut result = Object::Nil;
+        for statement in &self.0 {
+            result = statement.eval();
+            if let Object::Return(_) = result {
+                break;
+            }
+        }
+        result
     }
 }
 
@@ -52,6 +66,7 @@ impl If {
                     .as_ref()
                     .map_or(Object::Nil, |block| block.eval())
             }
+            Object::Return(_) => todo!(),
         }
     }
 }
@@ -172,6 +187,14 @@ mod eval_tests {
         );
         assert_eq!(
             generate_eval("if (1 < 2) { 10 } else { 20 }"),
+            Object::Int(10)
+        );
+        assert_eq!(generate_eval("return 10;"), Object::Int(10));
+        assert_eq!(generate_eval("return 10; 9;"), Object::Int(10));
+        assert_eq!(generate_eval("return 2 * 5; 9;"), Object::Int(10));
+        assert_eq!(generate_eval("9; return 2 * 5; 9;"), Object::Int(10));
+        assert_eq!(
+            generate_eval("if (10 > 1) {if (10 > 1) {return 10;}return 1;}"),
             Object::Int(10)
         );
     }

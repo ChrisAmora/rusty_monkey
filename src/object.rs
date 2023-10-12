@@ -1,10 +1,11 @@
-use std::fmt::Display;
+use std::{fmt::Display, io::Write};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Object {
     Nil,
     Int(i64),
     Bool(bool),
+    Return(Box<Object>),
 }
 
 impl Object {
@@ -19,6 +20,7 @@ impl Object {
                 }
             }
             Object::Int(_) => Object::Bool(false),
+            Object::Return(_) => Object::Bool(false),
         }
     }
 
@@ -108,6 +110,7 @@ impl Display for Object {
                     write!(f, "false")
                 }
             }
+            Object::Return(ret) => write!(f, "return {ret}"),
         }
     }
 }
