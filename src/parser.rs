@@ -114,7 +114,7 @@ impl Parser {
         self.assert_next_and_advance(TokenType::LBrace)?;
         let consequence = self.parse_block();
         let mut alternative: Option<Block> = None;
-        if self.assert_peek(&TokenType::Else) {
+        if self.tokens.next_if_eq(&TokenType::Else).is_some() {
             self.try_next_token();
             self.assert_next_and_advance(TokenType::LBrace);
             alternative = Some(self.parse_block());
@@ -185,10 +185,6 @@ impl Parser {
         })
     }
 
-    fn assert_peek(&mut self, token: &TokenType) -> bool {
-        self.tokens.peek().unwrap() == token
-    }
-
     fn parse_infix_expression(
         &mut self,
         left_expression: Expression,
@@ -224,7 +220,7 @@ impl Parser {
 }
 
 #[cfg(test)]
-mod test {
+mod parser_tests {
     use crate::{
         ast::{Expression, Infix, InfixOperation, Literal, Prefix, PrefixOperation, Statement},
         parser::Parser,
@@ -406,7 +402,7 @@ mod test {
         "#;
 
         // let program = r#"
-        // let foobar = y;
+        // if (true) { 10 }
         // "#;
 
         let mut lexer = lexer::Lexer::new(program.chars().peekable());
