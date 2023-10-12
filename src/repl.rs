@@ -28,7 +28,10 @@ impl Repl {
             let mut parser = Parser::new(lexer.peekable_iter());
             let mut program = Program::new();
             let eval = program.eval(&mut parser);
-            println!("{eval}");
+            match eval {
+                Ok(ev) => println!("{ev}"),
+                Err(err) => println!("error: {:?}", err),
+            }
         }
     }
 }

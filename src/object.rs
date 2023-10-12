@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use std::{fmt::Display, io::Write};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,90 +10,99 @@ pub enum Object {
 }
 
 impl Object {
-    pub fn bang(&self) -> Object {
+    pub fn bang(&self) -> Result<Object> {
         match self {
-            Object::Nil => Object::Bool(true),
+            Object::Nil => Ok(Object::Bool(true)),
             Object::Bool(value) => {
                 if value == &true {
-                    Object::Bool(false)
+                    Ok(Object::Bool(false))
                 } else {
-                    Object::Bool(true)
+                    Ok(Object::Bool(true))
                 }
             }
-            Object::Int(_) => Object::Bool(false),
-            Object::Return(_) => Object::Bool(false),
+            Object::Int(_) => Ok(Object::Bool(false)),
+            Object::Return(_) => Ok(Object::Bool(false)),
         }
     }
 
-    pub fn minus(&self) -> Object {
+    pub fn name(&self) -> &str {
         match self {
-            Object::Int(value) => Object::Int(-value),
-            _ => Object::Nil,
+            Object::Nil => "nil",
+            Object::Int(_) => "int",
+            Object::Bool(_) => "bool",
+            Object::Return(_) => "return",
         }
     }
 
-    pub fn add(&self, right: Object) -> Object {
+    pub fn minus(&self) -> Result<Object> {
+        match self {
+            Object::Int(value) => Ok(Object::Int(-value)),
+            object => Err(anyhow!("unknown operator -{}", object)),
+        }
+    }
+
+    pub fn add(&self, right: Object) -> Result<Object> {
         match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Int(left + right),
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Int(left + right)),
+            (x, y) => Err(anyhow!("type mismatch: {x} + {y}")),
+        }
+    }
+
+    pub fn sub(&self, right: Object) -> Result<Object> {
+        match (self, right) {
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Int(left - right)),
             _ => todo!(),
         }
     }
 
-    pub fn sub(&self, right: Object) -> Object {
+    pub fn mul(&self, right: Object) -> Result<Object> {
         match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Int(left - right),
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Int(left * right)),
             _ => todo!(),
         }
     }
 
-    pub fn mul(&self, right: Object) -> Object {
+    pub fn div(&self, right: Object) -> Result<Object> {
         match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Int(left * right),
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Int(left / right)),
             _ => todo!(),
         }
     }
 
-    pub fn div(&self, right: Object) -> Object {
+    pub fn eq(&self, right: Object) -> Result<Object> {
         match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Int(left / right),
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Bool(left == &right)),
+            (Object::Bool(left), Object::Bool(right)) => Ok(Object::Bool(left == &right)),
+            _ => todo!(),
+        }
+    }
+    pub fn not_eq(&self, right: Object) -> Result<Object> {
+        self.eq(right)?.bang()
+    }
+    pub fn gt(&self, right: Object) -> Result<Object> {
+        match (self, right) {
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Bool(left > &right)),
             _ => todo!(),
         }
     }
 
-    pub fn eq(&self, right: Object) -> Object {
+    pub fn lt(&self, right: Object) -> Result<Object> {
         match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Bool(left == &right),
-            (Object::Bool(left), Object::Bool(right)) => Object::Bool(left == &right),
-            _ => todo!(),
-        }
-    }
-    pub fn not_eq(&self, right: Object) -> Object {
-        self.eq(right).bang()
-    }
-    pub fn gt(&self, right: Object) -> Object {
-        match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Bool(left > &right),
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Bool(left < &right)),
             _ => todo!(),
         }
     }
 
-    pub fn lt(&self, right: Object) -> Object {
+    pub fn lte(&self, right: Object) -> Result<Object> {
         match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Bool(left < &right),
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Bool(left <= &right)),
             _ => todo!(),
         }
     }
 
-    pub fn lte(&self, right: Object) -> Object {
+    pub fn gte(&self, right: Object) -> Result<Object> {
         match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Bool(left <= &right),
-            _ => todo!(),
-        }
-    }
-
-    pub fn gte(&self, right: Object) -> Object {
-        match (self, right) {
-            (Object::Int(left), Object::Int(right)) => Object::Bool(left >= &right),
+            (Object::Int(left), Object::Int(right)) => Ok(Object::Bool(left >= &right)),
             _ => todo!(),
         }
     }

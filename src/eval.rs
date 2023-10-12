@@ -1,21 +1,25 @@
+use std::fmt::Display;
+
 use crate::{
     ast::{Block, Expression, If, InfixOperation, Literal, PrefixOperation, Statement},
     object::Object,
     parser::Parser,
 };
 
+use anyhow::Result;
+
 pub struct Program {}
 
 impl Program {
-    pub fn eval(&mut self, parser: &mut Parser) -> Object {
+    pub fn eval(&mut self, parser: &mut Parser) -> Result<Object> {
         let mut result = Object::Nil;
         for statement in parser.collect_statements() {
-            result = statement.eval();
+            result = statement.eval()?;
             if let Object::Return(expression) = result {
-                return *expression;
+                return Ok(*expression);
             }
         }
-        result
+        Ok(result)
     }
 
     pub fn new() -> Self {
@@ -24,9 +28,9 @@ impl Program {
 }
 
 impl Statement {
-    pub fn eval(&self) -> Object {
+    pub fn eval(&self) -> Result<Object> {
         match self {
-            Statement::Return(expression) => Object::Return(Box::new(expression.eval())),
+            Statement::Return(expression) => Ok(Object::Return(Box::new(expression.eval()?))),
             Statement::Expression(expression) => expression.eval(),
             Statement::Block(block) => block.eval(),
             Statement::Let {
@@ -38,25 +42,25 @@ impl Statement {
 }
 
 impl Block {
-    pub fn eval(&self) -> Object {
+    pub fn eval(&self) -> Result<Object> {
         let mut result = Object::Nil;
         for statement in &self.0 {
-            result = statement.eval();
+            result = statement.eval()?;
             if let Object::Return(_) = result {
                 break;
             }
         }
-        result
+        Ok(result)
     }
 }
 
 impl If {
-    pub fn eval(&self) -> Object {
-        match self.condition.eval() {
+    pub fn eval(&self) -> Result<Object> {
+        match self.condition.eval()? {
             Object::Nil => self
                 .alternative
                 .as_ref()
-                .map_or(Object::Nil, |block| block.eval()),
+                .map_or(Ok(Object::Nil), |block| block.eval()),
             Object::Int(_) => self.consequence.eval(),
             Object::Bool(b) => {
                 if b {
@@ -64,7 +68,7 @@ impl If {
                 }
                 self.alternative
                     .as_ref()
-                    .map_or(Object::Nil, |block| block.eval())
+                    .map_or(Ok(Object::Nil), |block| block.eval())
             }
             Object::Return(_) => todo!(),
         }
@@ -72,11 +76,11 @@ impl If {
 }
 
 impl Expression {
-    pub fn eval(&self) -> Object {
+    pub fn eval(&self) -> Result<Object> {
         match self {
             Expression::Literal(literal) => literal.eval(),
             Expression::Prefix(prefix) => {
-                let right = prefix.expression.eval();
+                let right = prefix.expression.eval()?;
                 match prefix.operation {
                     PrefixOperation::Bang => right.bang(),
                     PrefixOperation::Minus => right.minus(),
@@ -84,8 +88,8 @@ impl Expression {
             }
             Expression::If(if_expression) => if_expression.eval(),
             Expression::Infix(infix) => {
-                let left = infix.left_expression.eval();
-                let right = infix.right_expression.eval();
+                let left = infix.left_expression.eval()?;
+                let right = infix.right_expression.eval()?;
 
                 match infix.operation {
                     InfixOperation::Add => left.add(right),
@@ -98,7 +102,7 @@ impl Expression {
                     InfixOperation::Gte => left.gte(right),
                     InfixOperation::Lt => left.lt(right),
                     InfixOperation::Lte => left.lte(right),
-                    _ => Object::Nil,
+                    _ => Ok(Object::Nil),
                 }
             }
 
@@ -117,13 +121,13 @@ impl PrefixOperation {
 }
 
 impl Literal {
-    pub fn eval(&self) -> Object {
+    pub fn eval(&self) -> Result<Object> {
         match self {
-            Literal::Int(int) => Object::Int(*int),
-            Literal::True => Object::Bool(true),
-            Literal::False => Object::Bool(false),
-            Literal::Nil => Object::Nil,
-            Literal::String(_) => Object::Bool(false),
+            Literal::Int(int) => Ok(Object::Int(*int)),
+            Literal::True => Ok(Object::Bool(true)),
+            Literal::False => Ok(Object::Bool(false)),
+            Literal::Nil => Ok(Object::Nil),
+            Literal::String(_) => Ok(Object::Bool(false)),
         }
     }
 }
@@ -139,8 +143,33 @@ mod eval_tests {
         let mut parser = Parser::new(lexer.peekable_iter());
         let mut program = Program::new();
         let eval = program.eval(&mut parser);
-        println!("eval {text} is {eval}");
-        eval
+        match eval {
+            Ok(expr) => {
+                println!("{}", expr);
+                expr
+            }
+            Err(err) => {
+                println!("error: {}", err);
+                Object::Nil
+            }
+        }
+    }
+
+    fn generate_eval_err(text: &str, expected: &str) -> Object {
+        let mut lexer = lexer::Lexer::new_from_str(text);
+        let mut parser = Parser::new(lexer.peekable_iter());
+        let mut program = Program::new();
+        let eval = program.eval(&mut parser);
+        match eval {
+            Ok(_) => {
+                panic!("should not happen");
+            }
+            Err(err) => {
+                assert_eq!(err.to_string(), expected);
+                println!("error: {}", err);
+                Object::Nil
+            }
+        }
     }
 
     #[test]
@@ -196,6 +225,15 @@ mod eval_tests {
         assert_eq!(
             generate_eval("if (10 > 1) {if (10 > 1) {return 10;}return 1;}"),
             Object::Int(10)
+        );
+        generate_eval_err("5 + true;", "type mismatch: 5 + true");
+        generate_eval_err("5 + true; 5;", "type mismatch: 5 + true");
+        generate_eval_err("-true", "unknown operator -true");
+        generate_eval_err("true + false;", "type mismatch: true + false");
+        generate_eval_err("5; true + false; 5", "type mismatch: true + false");
+        generate_eval_err(
+            "if (10 > 1) { true + false; }",
+            "type mismatch: true + false",
         );
     }
 }
