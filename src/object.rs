@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use std::{fmt::Display, io::Write};
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Object {
@@ -7,6 +7,29 @@ pub enum Object {
     Int(i64),
     Bool(bool),
     Return(Box<Object>),
+}
+
+pub struct Environment {
+    pub map: HashMap<String, Object>,
+}
+
+pub struct Stack {
+    pub object: Object,
+    pub env: Environment,
+}
+
+impl Stack {
+    pub fn new(object: Object, env: Environment) -> Self {
+        Self { object, env }
+    }
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
 }
 
 impl Object {

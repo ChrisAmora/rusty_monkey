@@ -71,6 +71,10 @@ impl Identifier {
     pub fn new_str(name: &str) -> Self {
         Self(name.to_string())
     }
+
+    pub fn get_name(&self) -> String {
+        self.0.clone()
+    }
 }
 
 impl TryFrom<TokenType> for Identifier {
