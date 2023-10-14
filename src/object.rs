@@ -1,14 +1,44 @@
 use anyhow::{anyhow, Result};
 use std::{collections::HashMap, fmt::Display};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use crate::{ast::Block, token::Identifier};
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Object {
     Nil,
     Int(i64),
     Bool(bool),
     Return(Box<Object>),
+    Function(Function),
 }
 
+impl PartialEq for Function {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub parameters: Vec<Identifier>,
+    pub body: Block,
+    pub env: Environment,
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "fn(")?;
+        for (index, identifier) in self.parameters.iter().enumerate() {
+            write!(f, "{identifier}")?;
+            if index < self.parameters.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")\n {} \n}}", self.body)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Environment {
     pub map: HashMap<String, Object>,
 }
@@ -45,6 +75,7 @@ impl Object {
             }
             Object::Int(_) => Ok(Object::Bool(false)),
             Object::Return(_) => Ok(Object::Bool(false)),
+            Object::Function(_) => Ok(Object::Bool(false)),
         }
     }
 
@@ -54,6 +85,7 @@ impl Object {
             Object::Int(_) => "int",
             Object::Bool(_) => "bool",
             Object::Return(_) => "return",
+            Object::Function(_) => "fn",
         }
     }
 
@@ -144,6 +176,7 @@ impl Display for Object {
                 }
             }
             Object::Return(ret) => write!(f, "return {ret}"),
+            Object::Function(func) => write!(f, "{func}"),
         }
     }
 }

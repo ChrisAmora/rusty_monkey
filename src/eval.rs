@@ -1,10 +1,10 @@
 use crate::{
     ast::{Block, Expression, If, InfixOperation, Literal, PrefixOperation, Statement},
-    object::{Environment, Object, Stack},
+    object::{Environment, Function, Object, Stack},
     parser::Parser,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Ok, Result};
 
 pub struct Program {}
 
@@ -146,6 +146,11 @@ impl Expression {
                     }
                 }
             }
+
+            Expression::Call(call) => {
+                let f = call.function.eval(env);
+                todo!()
+            }
             Expression::Infix(infix) => {
                 let left = infix.left_expression.eval(env)?;
                 let right = infix.right_expression.eval(left.env)?;
@@ -178,7 +183,14 @@ impl Expression {
                     _ => Ok(Stack::new(Object::Nil, right.env)),
                 }
             }
-            _ => todo!(),
+            Expression::Function(f) => Ok(Stack::new(
+                Object::Function(Function {
+                    parameters: f.params.clone(),
+                    body: f.body.clone(),
+                    env: env.clone(),
+                }),
+                env,
+            )),
         }
     }
 }
@@ -208,18 +220,23 @@ impl Literal {
 mod eval_tests {
     use crate::{
         lexer,
-        object::{Environment, Object},
+        object::{Environment, Object, Stack},
         parser::Parser,
     };
+    use anyhow::Result;
 
     use super::Program;
 
-    fn generate_eval(text: &str) -> Object {
+    fn eval(text: &str) -> Result<Stack> {
         let mut lexer = lexer::Lexer::new_from_str(text);
         let mut parser = Parser::new(lexer.peekable_iter());
         let mut program = Program::new();
         let env = Environment::new();
-        let eval = program.eval(&mut parser, env);
+        program.eval(&mut parser, env)
+    }
+
+    fn generate_eval(text: &str) -> Object {
+        let eval = eval(text);
         match eval {
             Ok(expr) => {
                 println!("{}", expr.object);
@@ -233,12 +250,7 @@ mod eval_tests {
     }
 
     fn generate_eval_err(text: &str, expected: &str) -> Object {
-        let mut lexer = lexer::Lexer::new_from_str(text);
-        let mut parser = Parser::new(lexer.peekable_iter());
-        let mut program = Program::new();
-        let env = Environment::new();
-        let eval = program.eval(&mut parser, env);
-
+        let eval = eval(text);
         match eval {
             Ok(_) => {
                 panic!("should not happen");
@@ -312,6 +324,7 @@ mod eval_tests {
             generate_eval("if (10 > 1) {if (10 > 1) {return 10;}return 1;}"),
             Object::Int(10)
         );
+        // assert_eq!(generate_eval("fn(x) { x + 2; };"), Object::Int(5));
         generate_eval_err("5 + true;", "type mismatch: 5 + true");
         generate_eval_err("5 + true; 5;", "type mismatch: 5 + true");
         generate_eval_err("-true", "unknown operator -true");
