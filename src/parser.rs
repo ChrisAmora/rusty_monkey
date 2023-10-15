@@ -250,7 +250,7 @@ mod parser_tests {
             match statement {
                 Statement::Let {
                     identifier,
-                    expression,
+                    expression: _,
                 } => {
                     assert_eq!(&identifier, expected.next().unwrap());
                 }

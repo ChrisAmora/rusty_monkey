@@ -1,6 +1,9 @@
 use crate::{
-    ast::{Block, Expression, If, InfixOperation, Literal, PrefixOperation, Statement},
-    object::{Environment, Function, Object, Stack},
+    ast::{
+        Block, Call, Expression, Function, If, InfixOperation, Literal, PrefixOperation, Statement,
+    },
+    environment::{Environment, GlobalEnv},
+    object::Object,
     parser::Parser,
 };
 
@@ -9,25 +12,17 @@ use anyhow::{bail, Ok, Result};
 pub struct Program {}
 
 impl Program {
-    pub fn eval(&mut self, parser: &mut Parser, env: Environment) -> Result<Stack> {
+    pub fn eval(&mut self, parser: &mut Parser, env: GlobalEnv) -> Result<Object> {
         let mut result = Object::Nil;
-        let mut current_env = env;
 
         for statement in parser.collect_statements() {
-            let stack = statement.eval(current_env)?;
-            result = stack.object;
-            current_env = stack.env;
+            result = statement.eval(env.clone())?;
+
             if let Object::Return(expression) = result {
-                return Ok(Stack {
-                    object: *expression,
-                    env: current_env,
-                });
+                return Ok(*expression);
             }
         }
-        Ok(Stack {
-            object: result,
-            env: current_env,
-        })
+        Ok(result)
     }
 
     pub fn new() -> Self {
@@ -36,178 +31,154 @@ impl Program {
 }
 
 impl Statement {
-    pub fn eval(&self, env: Environment) -> Result<Stack> {
-        let mut current_env = env;
+    pub fn eval(self, env: GlobalEnv) -> Result<Object> {
         match self {
             Statement::Return(expression) => {
-                let stack = expression.eval(current_env)?;
-                let current_env = stack.env;
-                Ok(Stack {
-                    object: Object::Return(Box::new(stack.object)),
-                    env: current_env,
-                })
+                let result = expression.eval(env)?;
+                Ok(Object::Return(Box::new(result)))
             }
-            Statement::Expression(expression) => expression.eval(current_env),
-            Statement::Block(block) => block.eval(current_env),
+            Statement::Expression(expression) => expression.eval(env),
+            Statement::Block(block) => block.eval(env),
 
             Statement::Let {
                 identifier,
                 expression,
             } => {
-                let stack = expression.eval(current_env)?;
-                current_env = stack.env;
-                current_env
-                    .map
-                    .insert(identifier.get_name(), stack.object.clone());
-                Ok(Stack::new(stack.object, current_env))
+                let stack = expression.eval(env.clone())?;
+
+                env.borrow_mut().set(identifier.get_name(), &stack.clone());
+                Ok(Object::Nil)
             }
         }
     }
 }
 
 impl Block {
-    pub fn eval(&self, env: Environment) -> Result<Stack> {
+    pub fn eval(self, env: GlobalEnv) -> Result<Object> {
         let mut result = Object::Nil;
-        let mut current_env = env;
-        for statement in &self.0 {
-            let stack = statement.eval(current_env)?;
-            result = stack.object;
-            current_env = stack.env;
+        for statement in self.0 {
+            result = statement.eval(env.clone())?;
             if let Object::Return(_) = result {
                 break;
             }
         }
-        Ok(Stack {
-            object: result,
-            env: current_env,
-        })
+        Ok(result)
     }
 }
 
 impl If {
-    pub fn eval(&self, env: Environment) -> Result<Stack> {
-        let stack = self.condition.eval(env)?;
-        match stack.object {
+    pub fn eval(self, env: GlobalEnv) -> Result<Object> {
+        let result = self.condition.eval(env.clone())?;
+        match result {
             Object::Nil => {
-                let mut current_env = stack.env;
                 let mut result = Object::Nil;
-                for block in self.alternative.as_ref() {
-                    let stack = block.eval(current_env)?;
-                    result = stack.object;
-                    current_env = stack.env;
+                if let Some(block) = self.alternative {
+                    result = block.eval(env.clone())?;
                 }
-                Ok(Stack {
-                    object: result,
-                    env: current_env,
-                })
+                Ok(result)
             }
-            Object::Int(_) => self.consequence.eval(stack.env),
+            Object::Int(_) => self.consequence.eval(env),
             Object::Bool(b) => {
                 if b {
-                    let stack = self.consequence.eval(stack.env)?;
-                    return Ok(Stack::new(stack.object, stack.env));
+                    let result = self.consequence.eval(env)?;
+                    return Ok(result);
                 }
-                let mut current_env = stack.env;
                 let mut result = Object::Nil;
-                for block in self.alternative.as_ref() {
-                    let stack = block.eval(current_env)?;
-                    result = stack.object;
-                    current_env = stack.env;
+                if let Some(block) = self.alternative {
+                    result = block.eval(env.clone())?;
                 }
-                Ok(Stack {
-                    object: result,
-                    env: current_env,
-                })
+                Ok(result)
             }
-            // Object::Return(_) => todo!(),
             _ => todo!(),
         }
     }
 }
 
+impl Call {
+    pub fn eval(self, env: GlobalEnv) -> Result<Object> {
+        let function = self.function.eval(env.clone())?;
+
+        return match function {
+            Object::Function(f) => {
+                let resolved_args = f
+                    .parameters
+                    .into_iter()
+                    .map(|id| id.get_name())
+                    .zip(
+                        self.arguments
+                            .into_iter()
+                            .map(|exp| exp.eval(env.clone()))
+                            .flatten(),
+                    )
+                    .collect();
+                let env = Environment::new_enclosed(env, resolved_args);
+                f.body.eval(env)
+            }
+            _ => todo!(),
+        };
+    }
+}
+
+impl Function {
+    pub fn eval(self, env: GlobalEnv) -> Result<Object> {
+        Ok(Object::Function(crate::object::Function {
+            parameters: self.params,
+            body: self.body,
+            env,
+        }))
+    }
+}
+
 impl Expression {
-    pub fn eval(&self, env: Environment) -> Result<Stack> {
+    pub fn eval(self, env: GlobalEnv) -> Result<Object> {
         match self {
-            Expression::Literal(literal) => Ok(Stack::new(literal.eval()?, env)),
+            Expression::Literal(literal) => Ok(literal.eval()?),
             Expression::Prefix(prefix) => {
                 let right = prefix.expression.eval(env)?;
                 match prefix.operation {
-                    PrefixOperation::Bang => Ok(Stack::new(right.object.bang()?, right.env)),
-                    PrefixOperation::Minus => Ok(Stack::new(right.object.minus()?, right.env)),
+                    PrefixOperation::Bang => Ok(right.bang()?),
+                    PrefixOperation::Minus => Ok(right.minus()?),
                 }
             }
             Expression::If(if_expression) => if_expression.eval(env),
             Expression::Identifier(id) => {
-                let result = env.map.get(&id.get_name());
+                let result = env.borrow().get(&id.get_name());
                 match result {
-                    Some(value) => Ok(Stack::new(value.clone(), env)),
+                    Some(value) => Ok(value.clone()),
                     None => {
                         bail!("identifier not found: {}", &id.get_name())
                     }
                 }
             }
 
-            Expression::Call(call) => {
-                let f = call.function.eval(env);
-                todo!()
-            }
+            Expression::Call(call) => call.eval(env),
             Expression::Infix(infix) => {
-                let left = infix.left_expression.eval(env)?;
-                let right = infix.right_expression.eval(left.env)?;
+                let left = infix.left_expression.eval(env.clone())?;
+                let right = infix.right_expression.eval(env)?;
 
                 match infix.operation {
-                    InfixOperation::Add => {
-                        Ok(Stack::new(left.object.add(right.object)?, right.env))
-                    }
-                    InfixOperation::Sub => {
-                        Ok(Stack::new(left.object.sub(right.object)?, right.env))
-                    }
-                    InfixOperation::Mul => {
-                        Ok(Stack::new(left.object.mul(right.object)?, right.env))
-                    }
-                    InfixOperation::Div => {
-                        Ok(Stack::new(left.object.div(right.object)?, right.env))
-                    }
-                    InfixOperation::Eq => Ok(Stack::new(left.object.eq(right.object)?, right.env)),
-                    InfixOperation::NotEq => {
-                        Ok(Stack::new(left.object.not_eq(right.object)?, right.env))
-                    }
-                    InfixOperation::Gt => Ok(Stack::new(left.object.gt(right.object)?, right.env)),
-                    InfixOperation::Gte => {
-                        Ok(Stack::new(left.object.gte(right.object)?, right.env))
-                    }
-                    InfixOperation::Lt => Ok(Stack::new(left.object.lt(right.object)?, right.env)),
-                    InfixOperation::Lte => {
-                        Ok(Stack::new(left.object.lte(right.object)?, right.env))
-                    }
-                    _ => Ok(Stack::new(Object::Nil, right.env)),
+                    InfixOperation::Add => Ok(left.add(right)?),
+                    InfixOperation::Sub => Ok(left.sub(right)?),
+                    InfixOperation::Mul => Ok(left.mul(right)?),
+                    InfixOperation::Div => Ok(left.div(right)?),
+                    InfixOperation::Eq => Ok(left.eq(right)?),
+                    InfixOperation::NotEq => Ok(left.not_eq(right)?),
+                    InfixOperation::Gt => Ok(left.gt(right)?),
+                    InfixOperation::Gte => Ok(left.gte(right)?),
+                    InfixOperation::Lt => Ok(left.lt(right)?),
+                    InfixOperation::Lte => Ok(left.lte(right)?),
+                    _ => Ok(Object::Nil),
                 }
             }
-            Expression::Function(f) => Ok(Stack::new(
-                Object::Function(Function {
-                    parameters: f.params.clone(),
-                    body: f.body.clone(),
-                    env: env.clone(),
-                }),
-                env,
-            )),
-        }
-    }
-}
-
-impl PrefixOperation {
-    pub fn eval(&self) -> Object {
-        match self {
-            PrefixOperation::Bang => todo!(),
-            PrefixOperation::Minus => todo!(),
+            Expression::Function(f) => Ok(f.eval(env)?),
         }
     }
 }
 
 impl Literal {
-    pub fn eval(&self) -> Result<Object> {
+    pub fn eval(self) -> Result<Object> {
         match self {
-            Literal::Int(int) => Ok(Object::Int(*int)),
+            Literal::Int(int) => Ok(Object::Int(int)),
             Literal::True => Ok(Object::Bool(true)),
             Literal::False => Ok(Object::Bool(false)),
             Literal::Nil => Ok(Object::Nil),
@@ -218,29 +189,27 @@ impl Literal {
 
 #[cfg(test)]
 mod eval_tests {
-    use crate::{
-        lexer,
-        object::{Environment, Object, Stack},
-        parser::Parser,
-    };
+    use std::{cell::RefCell, rc::Rc};
+
+    use crate::{environment::Environment, lexer, object::Object, parser::Parser};
     use anyhow::Result;
 
     use super::Program;
 
-    fn eval(text: &str) -> Result<Stack> {
+    fn eval(text: &str) -> Result<Object> {
         let mut lexer = lexer::Lexer::new_from_str(text);
         let mut parser = Parser::new(lexer.peekable_iter());
         let mut program = Program::new();
         let env = Environment::new();
-        program.eval(&mut parser, env)
+        program.eval(&mut parser, Rc::new(RefCell::new(env)))
     }
 
     fn generate_eval(text: &str) -> Object {
         let eval = eval(text);
         match eval {
             Ok(expr) => {
-                println!("{}", expr.object);
-                expr.object
+                println!("{}", expr);
+                expr
             }
             Err(err) => {
                 println!("error: {}", err);
@@ -324,7 +293,6 @@ mod eval_tests {
             generate_eval("if (10 > 1) {if (10 > 1) {return 10;}return 1;}"),
             Object::Int(10)
         );
-        // assert_eq!(generate_eval("fn(x) { x + 2; };"), Object::Int(5));
         generate_eval_err("5 + true;", "type mismatch: 5 + true");
         generate_eval_err("5 + true; 5;", "type mismatch: 5 + true");
         generate_eval_err("-true", "unknown operator -true");
@@ -335,5 +303,27 @@ mod eval_tests {
             "type mismatch: true + false",
         );
         generate_eval_err("foobar", "identifier not found: foobar");
+        assert_eq!(
+            generate_eval("let identity = fn(x) { x; }; identity(5);"),
+            Object::Int(5)
+        );
+        assert_eq!(
+            generate_eval("let identity = fn(x) { return x; }; identity(5);"),
+            Object::Int(5)
+        );
+        assert_eq!(
+            generate_eval("let double = fn(x) { x * 2; }; double(5);"),
+            Object::Int(10)
+        );
+        assert_eq!(
+            generate_eval("let add = fn(x, y) { x + y; }; add(5, 5);"),
+            Object::Int(10)
+        );
+        assert_eq!(
+            generate_eval("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));"),
+            Object::Int(20)
+        );
+        assert_eq!(generate_eval("fn(x) { x; }(5)"), Object::Int(5));
+        assert_eq!(generate_eval("let add = fn(x, y) { x + y; };"), Object::Nil);
     }
 }

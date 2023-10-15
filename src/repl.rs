@@ -1,13 +1,14 @@
-use std::io;
+use std::{cell::RefCell, io, rc::Rc};
 
-use crate::{eval::Program, lexer::Lexer, object::Environment, parser::Parser};
+use crate::{environment::Environment, eval::Program, lexer::Lexer, parser::Parser};
 pub struct Repl {}
 
 impl Repl {
     pub fn start(&self) {
         println!("Hello This is the Monkey programming language!");
         println!("Feel free to type in commands");
-        let mut env = Environment::new();
+        let new_env = Environment::new();
+        let env = Rc::new(RefCell::new(new_env));
 
         loop {
             let mut input = String::new();
@@ -28,14 +29,12 @@ impl Repl {
             let mut lexer = Lexer::new_from_str(input.as_str());
             let mut parser = Parser::new(lexer.peekable_iter());
             let mut program = Program::new();
-            let eval = program.eval(&mut parser, env);
+            let eval = program.eval(&mut parser, env.clone());
             match eval {
                 Ok(stack) => {
-                    env = stack.env;
-                    println!("{}", stack.object)
+                    println!("{}", stack)
                 }
                 Err(err) => {
-                    env = Environment::new();
                     println!("error: {:?}", err)
                 }
             }

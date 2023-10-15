@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
-use crate::{ast::Block, token::Identifier};
+use crate::{ast::Block, environment::GlobalEnv, token::Identifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
@@ -22,7 +22,7 @@ impl PartialEq for Function {
 pub struct Function {
     pub parameters: Vec<Identifier>,
     pub body: Block,
-    pub env: Environment,
+    pub env: GlobalEnv,
 }
 
 impl Display for Function {
@@ -30,35 +30,11 @@ impl Display for Function {
         write!(f, "fn(")?;
         for (index, identifier) in self.parameters.iter().enumerate() {
             write!(f, "{identifier}")?;
-            if index < self.parameters.len() - 1 {
+            if index != self.parameters.len() - 1 {
                 write!(f, ", ")?;
             }
         }
         write!(f, ")\n {} \n}}", self.body)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Environment {
-    pub map: HashMap<String, Object>,
-}
-
-pub struct Stack {
-    pub object: Object,
-    pub env: Environment,
-}
-
-impl Stack {
-    pub fn new(object: Object, env: Environment) -> Self {
-        Self { object, env }
-    }
-}
-
-impl Environment {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
     }
 }
 
