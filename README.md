@@ -1,13 +1,16 @@
-# Description
+# Rusty Monkey
 
-Rust implementation of the monkey language.
 
-## Running the app
+## About
+Rust implementation of Monkey programming language from the book Writing an Interpreter in Go
+
+## Start the repl
 ```bash
 $ cargo run
-let f = fn(x,y) {x * y + x}
-let result = f(5 * 3, 10)
-result
+Welcome to the Monkey programming language!
+>> let f = fn(x,y) {x * y + x}
+>> let result = f(5 * 3, 10)
+>> result
 # 165
 ```
 
