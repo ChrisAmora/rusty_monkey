@@ -108,9 +108,9 @@ return false;
 10 != 9;
 "#;
 
-        let mut lexer = lexer::Lexer::new(program);
+        let lexer = lexer::Lexer::new(program);
 
-        while let Some(l) = lexer.next() {
+        for l in lexer {
             println!("{:?}", l);
         }
     }

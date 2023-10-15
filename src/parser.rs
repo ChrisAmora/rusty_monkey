@@ -231,7 +231,7 @@ mod parser_tests {
         "#;
 
         let lexer = lexer::Lexer::new(program);
-        let mut parser = Parser::new(lexer.peekable());
+        let parser = Parser::new(lexer.peekable());
 
         let expected_vec = vec![
             Identifier::new("five".to_string()),
@@ -240,15 +240,13 @@ mod parser_tests {
 
         let mut expected = expected_vec.iter();
 
-        while let Some(statement) = parser.next() {
-            match statement {
-                Statement::Let {
-                    identifier,
-                    expression: _,
-                } => {
-                    assert_eq!(&identifier, expected.next().unwrap());
-                }
-                _ => {}
+        for statement in parser {
+            if let Statement::Let {
+                identifier,
+                expression: _,
+            } = statement
+            {
+                assert_eq!(&identifier, expected.next().unwrap());
             }
         }
     }
@@ -261,9 +259,9 @@ mod parser_tests {
         "#;
 
         let lexer = lexer::Lexer::new(program);
-        let mut parser = Parser::new(lexer.peekable());
+        let parser = Parser::new(lexer.peekable());
 
-        while let Some(statement) = parser.next() {
+        for statement in parser {
             assert!(matches!(
                 statement,
                 Statement::Return(Expression::Literal(Literal::Int(10)))
@@ -292,7 +290,7 @@ mod parser_tests {
         "#;
 
         let lexer = lexer::Lexer::new(program);
-        let mut parser = Parser::new(lexer.peekable());
+        let parser = Parser::new(lexer.peekable());
 
         let expected_vec = vec![
             Expression::Identifier(Identifier("foobar".to_string())),
@@ -343,7 +341,7 @@ mod parser_tests {
 
         let mut expected = expected_vec.iter();
 
-        while let Some(statement) = parser.next() {
+        for statement in parser {
             match statement {
                 Statement::Expression(expression) => {
                     assert_eq!(&expression, expected.next().unwrap());
