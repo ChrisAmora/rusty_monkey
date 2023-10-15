@@ -1,27 +1,26 @@
 use crate::ast::{
     Block, Call, Expression, Function, If, Infix, Literal, Prefix, PrefixOperation, Statement,
 };
+use crate::lexer::Lexer;
 use crate::token::{Identifier, TokenType};
-use std::iter::{self, Peekable};
-use std::vec::IntoIter;
+use std::iter::Peekable;
 
-pub struct Parser {
-    tokens: Peekable<IntoIter<TokenType>>,
+pub struct Parser<'a> {
+    tokens: Peekable<Lexer<'a>>,
 }
 
-impl Parser {
-    pub fn new(tokens: Peekable<IntoIter<TokenType>>) -> Self {
-        Parser { tokens }
-    }
-
-    pub fn parse_next_statement(&mut self) -> Option<Statement> {
+impl<'a> Iterator for Parser<'a> {
+    type Item = Statement;
+    fn next(&mut self) -> Option<Self::Item> {
         self.tokens
             .next()
             .and_then(|token| self.parse_statement(token))
     }
+}
 
-    pub fn collect_statements(&mut self) -> Vec<Statement> {
-        iter::from_fn(|| self.parse_next_statement()).collect()
+impl<'a> Parser<'a> {
+    pub fn new(tokens: Peekable<Lexer<'a>>) -> Self {
+        Parser { tokens }
     }
 
     fn parse_statement(&mut self, token: TokenType) -> Option<Statement> {
@@ -48,10 +47,6 @@ impl Parser {
 
     pub fn try_next_token(&mut self) -> TokenType {
         self.tokens.next().unwrap()
-    }
-
-    pub fn assert_next_ident(&mut self) -> Identifier {
-        self.try_next_token().try_into().unwrap()
     }
 
     pub fn parse_expr_statement(&mut self) -> Statement {
@@ -235,9 +230,8 @@ mod parser_tests {
         let ten = 10 + 2;
         "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars().peekable());
-        let peek = lexer.peekable_iter();
-        let mut parser = Parser::new(peek);
+        let lexer = lexer::Lexer::new(program);
+        let mut parser = Parser::new(lexer.peekable());
 
         let expected_vec = vec![
             Identifier::new("five".to_string()),
@@ -246,7 +240,7 @@ mod parser_tests {
 
         let mut expected = expected_vec.iter();
 
-        while let Some(statement) = parser.parse_next_statement() {
+        while let Some(statement) = parser.next() {
             match statement {
                 Statement::Let {
                     identifier,
@@ -266,11 +260,10 @@ mod parser_tests {
         return 10;
         "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars().peekable());
-        let peek = lexer.peekable_iter();
-        let mut parser = Parser::new(peek);
+        let lexer = lexer::Lexer::new(program);
+        let mut parser = Parser::new(lexer.peekable());
 
-        while let Some(statement) = parser.parse_next_statement() {
+        while let Some(statement) = parser.next() {
             assert!(matches!(
                 statement,
                 Statement::Return(Expression::Literal(Literal::Int(10)))
@@ -298,9 +291,8 @@ mod parser_tests {
         88 + 2 * 3;
         "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars().peekable());
-        let peek = lexer.peekable_iter();
-        let mut parser = Parser::new(peek);
+        let lexer = lexer::Lexer::new(program);
+        let mut parser = Parser::new(lexer.peekable());
 
         let expected_vec = vec![
             Expression::Identifier(Identifier("foobar".to_string())),
@@ -351,7 +343,7 @@ mod parser_tests {
 
         let mut expected = expected_vec.iter();
 
-        while let Some(statement) = parser.parse_next_statement() {
+        while let Some(statement) = parser.next() {
             match statement {
                 Statement::Expression(expression) => {
                     assert_eq!(&expression, expected.next().unwrap());
@@ -401,13 +393,8 @@ mod parser_tests {
         return x(5+3);
         "#;
 
-        // let program = r#"
-        // if (true) { 10 }
-        // "#;
-
-        let mut lexer = lexer::Lexer::new(program.chars().peekable());
-        let peek = lexer.peekable_iter();
-        let mut parser = Parser::new(peek);
+        let lexer = lexer::Lexer::new(program);
+        let parser = Parser::new(lexer.peekable());
 
         let expected_vec = vec![
             String::from("foobar"),
@@ -442,11 +429,8 @@ mod parser_tests {
             String::from("return x ((5+3))"),
         ];
 
-        // let expected_vec = vec![String::from("(mock!)")];
-
         let mut expected = expected_vec.iter();
-        let statements = parser.collect_statements();
-        for statement in statements {
+        for statement in parser {
             let formatted = format!("{statement}");
             println!("{formatted}");
             assert_eq!(&formatted, expected.next().unwrap());

@@ -2,37 +2,18 @@
 use crate::token::{Identifier, TokenType};
 use std::iter::{self, Peekable};
 use std::str::Chars;
-use std::vec::IntoIter;
 
 pub struct Lexer<'a> {
     chars_iter: Peekable<Chars<'a>>,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(chars_iter: Peekable<Chars<'a>>) -> Self {
-        Lexer { chars_iter }
-    }
-
-    pub fn new_from_str(text: &'a str) -> Self {
-        Lexer {
-            chars_iter: text.chars().peekable(),
-        }
-    }
-
-    pub fn peekable_iter(&mut self) -> Peekable<IntoIter<TokenType>> {
-        let mut all_collected = vec![];
-        while let Some(token) = self.get_next_token() {
-            all_collected.push(token);
-        }
-        all_collected.into_iter().peekable()
-    }
-
-    pub fn get_next_token(&mut self) -> Option<TokenType> {
+impl<'a> Iterator for Lexer<'a> {
+    type Item = TokenType;
+    fn next(&mut self) -> Option<Self::Item> {
         if let Some(char) = self.chars_iter.next() {
             return match char {
-                ' ' => self.get_next_token(),
-                // '\n' => Some(TokenType::LineBreak),
-                '\n' => self.get_next_token(),
+                ' ' => self.next(),
+                '\n' => self.next(),
                 ',' => Some(TokenType::Comma),
                 ':' => Some(TokenType::Colon),
                 ';' => Some(TokenType::Semicolon),
@@ -97,8 +78,16 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl<'a> Lexer<'a> {
+    pub fn new(text: &'a str) -> Self {
+        Lexer {
+            chars_iter: text.chars().peekable(),
+        }
+    }
+}
+
 mod test {
-    // #[test]
+    #[test]
     fn parse() {
         use crate::lexer;
         let program = r#"
@@ -119,9 +108,9 @@ return false;
 10 != 9;
 "#;
 
-        let mut lexer = lexer::Lexer::new(program.chars().peekable());
+        let mut lexer = lexer::Lexer::new(program);
 
-        while let Some(l) = lexer.get_next_token() {
+        while let Some(l) = lexer.next() {
             println!("{:?}", l);
         }
     }

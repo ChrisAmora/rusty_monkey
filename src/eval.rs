@@ -9,13 +9,14 @@ use crate::{
 
 use anyhow::{bail, Ok, Result};
 
+#[derive(Default)]
 pub struct Program {}
 
 impl Program {
     pub fn eval(&mut self, parser: &mut Parser, env: GlobalEnv) -> Result<Object> {
         let mut result = Object::Nil;
 
-        for statement in parser.collect_statements() {
+        for statement in parser {
             result = statement.eval(env.clone())?;
 
             if let Object::Return(expression) = result {
@@ -23,10 +24,6 @@ impl Program {
             }
         }
         Ok(result)
-    }
-
-    pub fn new() -> Self {
-        Self {}
     }
 }
 
@@ -98,24 +95,23 @@ impl Call {
     pub fn eval(self, env: GlobalEnv) -> Result<Object> {
         let function = self.function.eval(env.clone())?;
 
-        return match function {
+        match function {
             Object::Function(f) => {
-                let resolved_args = f
+                let resolved_args_map = f
                     .parameters
                     .into_iter()
                     .map(|id| id.get_name())
                     .zip(
                         self.arguments
                             .into_iter()
-                            .map(|exp| exp.eval(env.clone()))
-                            .flatten(),
+                            .flat_map(|exp| exp.eval(env.clone())),
                     )
                     .collect();
-                let env = Environment::new_enclosed(env, resolved_args);
+                let env = Environment::new_enclosed(env, resolved_args_map);
                 f.body.eval(env)
             }
             _ => todo!(),
-        };
+        }
     }
 }
 
@@ -197,10 +193,10 @@ mod eval_tests {
     use super::Program;
 
     fn eval(text: &str) -> Result<Object> {
-        let mut lexer = lexer::Lexer::new_from_str(text);
-        let mut parser = Parser::new(lexer.peekable_iter());
-        let mut program = Program::new();
-        let env = Environment::new();
+        let lexer = lexer::Lexer::new(text);
+        let mut parser = Parser::new(lexer.peekable());
+        let mut program = Program::default();
+        let env = Environment::default();
         program.eval(&mut parser, Rc::new(RefCell::new(env)))
     }
 

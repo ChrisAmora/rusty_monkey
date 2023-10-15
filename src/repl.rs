@@ -7,7 +7,7 @@ impl Repl {
     pub fn start(&self) {
         println!("Hello This is the Monkey programming language!");
         println!("Feel free to type in commands");
-        let new_env = Environment::new();
+        let new_env = Environment::default();
         let env = Rc::new(RefCell::new(new_env));
 
         loop {
@@ -26,9 +26,9 @@ impl Repl {
                 continue;
             }
 
-            let mut lexer = Lexer::new_from_str(input.as_str());
-            let mut parser = Parser::new(lexer.peekable_iter());
-            let mut program = Program::new();
+            let lexer = Lexer::new(input.as_str());
+            let mut parser = Parser::new(lexer.peekable());
+            let mut program = Program::default();
             let eval = program.eval(&mut parser, env.clone());
             match eval {
                 Ok(stack) => {
